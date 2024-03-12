@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.Json;
 
 namespace API.Controllers
 {
@@ -15,24 +16,31 @@ namespace API.Controllers
         {
             this.dbcontext = dbcontext;
         }
+
         [HttpGet("getallstudents")]
         public async Task<ActionResult<List<Student>>> GetAllStudents()
         {
-            var studentlist = await dbcontext.Students.ToListAsync();
-            return Ok(studentlist);
+            var studentslist = await dbcontext.Students.ToListAsync();
+            return Ok(studentslist);
         }
         [HttpGet("getstudent/{id}")]
-        public async Task<ActionResult<Student>> GetlStudentById(int id)
+        public async Task<ActionResult<Student>> GetStudentById(int id)
         {
-            var student = await dbcontext.Students.FirstOrDefaultAsync(x => x.Id == id);
-            return Ok(student);
+            Dictionary<string, object> res = new Dictionary<string, object>();
+            var student = await dbcontext.Students.SingleOrDefaultAsync(x => x.Id == id);
+            if(student==null)
+            {
+                res["status"] = 0;
+                res["message"] = "Student Not Found!";
+                return NotFound(res);
+            }
+            return Ok(student); 
         }
 
         [HttpPost("createstudent")]
-        public async Task<ActionResult<Student>> CreateUpdateStudent(Student obj)
-        {
+        public async Task<ActionResult<Student>> CreateStudent(Student obj) {
             Dictionary<string, object> res = new Dictionary<string, object>();
-            if (obj.Id == 0)
+            if(obj.Id==0)
             {
                 await dbcontext.Students.AddAsync(obj);
                 await dbcontext.SaveChangesAsync();
@@ -42,11 +50,11 @@ namespace API.Controllers
             }
             else
             {
-                if (dbcontext.Students.Any(x => x.Id != obj.Id))
+                if(dbcontext.Students.Any(x=>x.Id!=obj.Id && x.FirstName == obj.FirstName))
                 {
                     res["status"] = 0;
                     res["message"] = "Student Not Found!";
-                    return Ok(res);
+                    return NotFound(res);
                 }
                 else
                 {
@@ -59,21 +67,26 @@ namespace API.Controllers
             }
         }
 
-        [HttpGet("deleteemployee/{id}")]
+        [HttpDelete("deletestudent/{id}")]
         public async Task<ActionResult<Student>> DeleteStudent(int id)
         {
             Dictionary<string, object> res = new Dictionary<string, object>();
-            var obj = await dbcontext.Students.FirstOrDefaultAsync(x => x.Id == id);
+            Student? obj = await dbcontext.Students.FirstOrDefaultAsync(x => x.Id == id);
             if (obj == null)
             {
-                return NotFound();
+                res["status"] = 0;
+                res["message"] = "Student Not Found!";
+                return NotFound(res);
+            }
+            else
+            {
+                dbcontext.Students.Remove(obj);
+                await dbcontext.SaveChangesAsync();
+                res["status"] = 1;
+                res["message"] = "Student Deleted Successfully!";
+                return Ok(res);
             }
 
-            dbcontext.Students.Remove(obj);
-            await dbcontext.SaveChangesAsync();
-            res["status"] = 1;
-            res["message"] = "Student Deleted Successfully!";
-            return Ok(res);
         }
     }
 }
